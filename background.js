@@ -38,12 +38,14 @@ chrome.storage.local.get(["categories", "apiKey"], (result) => {
 // 处理分析请求的函数
 async function handleAnalysis(article, tabId) {
   try {
-    const config = await chrome.storage.local.get(["apiKey", "apiEndpoint", "model"]);
+    const config = await chrome.storage.local.get(["apiKey", "apiEndpoint", "model", "enableMaxLength", "maxLength"]);
     console.log("Starting analysis with config:", {
       hasApiKey: !!config.apiKey,
       apiEndpoint: config.apiEndpoint || "https://api.openai.com/v1/chat/completions",
       model: config.model || "gpt-3.5-turbo",
       categoriesCount: userCategories.length,
+      enableMaxLength: config.enableMaxLength,
+      maxLength: config.maxLength,
     });
 
     if (!config.apiKey) {
@@ -74,16 +76,7 @@ async function handleAnalysis(article, tabId) {
     }
 
     // 准备 API 请求
-    const prompt = `分析以下文章内容，从给定的分类中选择最合适的三个。只需返回分类ID，每行一个ID：
-
-文章标题：${article.title}
-文章描述：${article.description}
-文章内容：${article.content}
-
-可选分类：
-${userCategories.map((cat) => `${cat.groupId}: ${cat.groupName}`).join("\n")}
-
-请直接返回三个最匹配的分类ID，每行一个，不要其他任何文字：`;
+    const prompt = await buildPrompt(article, userCategories);
 
     console.log("Preparing API request...");
 
@@ -101,6 +94,12 @@ ${userCategories.map((cat) => `${cat.groupId}: ${cat.groupName}`).join("\n")}
       ],
       temperature: 0.7,
     };
+
+    console.log("API request body:", {
+      model: requestBody.model,
+      messageLength: requestBody.messages[0].content.length,
+      temperature: requestBody.temperature,
+    });
 
     console.log("Sending API request...");
 
@@ -169,4 +168,43 @@ function parseAISuggestions(aiResponse) {
 
   console.log("Final suggestions:", suggestions);
   return suggestions;
+}
+
+// 构建 AI 提示
+async function buildPrompt(article, categories) {
+  let content = article.content;
+  const originalLength = content.length;
+
+  // 检查是否需要限制内容长度
+  const result = await chrome.storage.local.get(["enableMaxLength", "maxLength"]);
+  if (result.enableMaxLength && result.maxLength) {
+    const maxLength = parseInt(result.maxLength);
+    if (content.length > maxLength) {
+      content = content.substring(0, maxLength) + "...（已截断）";
+      console.log(`Content length reduced from ${originalLength} to ${maxLength} characters`);
+    }
+  }
+
+  const prompt = `请根据以下文章内容，从给定的分类列表中选择最合适的3个分类。
+
+文章标题：${article.title}
+文章描述：${article.description}
+文章内容：${content}
+
+可选分类：
+${categories.map((cat) => `${cat.groupId}: ${cat.groupName}${cat.description ? ` (${cat.description})` : ""}`).join("\n")}
+
+请直接返回三个最匹配的分类ID，每行一个，不要其他任何文字：`;
+
+  console.log("Generated prompt:", {
+    titleLength: article.title.length,
+    descriptionLength: article.description.length,
+    contentLength: content.length,
+    categoriesCount: categories.length,
+    totalPromptLength: prompt.length,
+    wasContentTruncated: originalLength !== content.length,
+    truncatedAmount: originalLength - content.length,
+  });
+
+  return prompt;
 }

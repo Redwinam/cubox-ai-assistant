@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "Cubox AI 分类助手",
+  "name": "Cubox AI 小仓鼠助手",
   "version": "1.0",
   "description": "使用 AI 为 Cubox 文章智能推荐分类",
   "permissions": [

@@ -10,7 +10,19 @@ document.addEventListener("DOMContentLoaded", () => {
   // 绑定按钮事件
   document.getElementById("saveButton").addEventListener("click", saveSettings);
   document.getElementById("refreshCategories").addEventListener("click", fetchCuboxCategories);
-  document.getElementById("saveCategoriesButton").addEventListener("click", saveCategories);
+
+  // 绑定字数限制复选框事件
+  const enableMaxLength = document.getElementById("enableMaxLength");
+  const maxLength = document.getElementById("maxLength");
+  const lengthInput = maxLength.parentElement;
+
+  enableMaxLength.addEventListener("change", () => {
+    maxLength.disabled = !enableMaxLength.checked;
+    lengthInput.classList.toggle("disabled", !enableMaxLength.checked);
+    if (enableMaxLength.checked && !maxLength.value) {
+      maxLength.value = "2000"; // 默认值
+    }
+  });
 });
 
 function initializeTabs() {
@@ -30,7 +42,7 @@ function initializeTabs() {
 }
 
 function loadSettings() {
-  chrome.storage.local.get(["apiKey", "apiEndpoint", "model", "categories"], (result) => {
+  chrome.storage.local.get(["apiKey", "apiEndpoint", "model", "categories", "enableMaxLength", "maxLength"], (result) => {
     if (result.apiKey) {
       document.getElementById("apiKey").value = result.apiKey;
     }
@@ -44,6 +56,16 @@ function loadSettings() {
       categories = result.categories;
       renderCategories();
     }
+
+    // 加载字数限制设置
+    const enableMaxLength = document.getElementById("enableMaxLength");
+    const maxLength = document.getElementById("maxLength");
+
+    enableMaxLength.checked = result.enableMaxLength || false;
+    maxLength.disabled = !enableMaxLength.checked;
+    if (result.maxLength) {
+      maxLength.value = result.maxLength;
+    }
   });
 }
 
@@ -51,6 +73,8 @@ function saveSettings() {
   const apiKey = document.getElementById("apiKey").value.trim();
   const apiEndpoint = document.getElementById("apiEndpoint").value.trim();
   const model = document.getElementById("model").value.trim();
+  const enableMaxLength = document.getElementById("enableMaxLength").checked;
+  const maxLength = document.getElementById("maxLength").value;
 
   try {
     // 验证必填字段
@@ -62,12 +86,22 @@ function saveSettings() {
       throw new Error("请输入模型名称");
     }
 
+    // 验证字数限制
+    if (enableMaxLength) {
+      const lengthValue = parseInt(maxLength);
+      if (!lengthValue || lengthValue < 100) {
+        throw new Error("请输入有效的字数限制（至少 100 字）");
+      }
+    }
+
     // 保存设置
     chrome.storage.local.set(
       {
         apiKey,
         apiEndpoint: apiEndpoint || "https://api.openai.com/v1/chat/completions",
         model: model || "gpt-3.5-turbo",
+        enableMaxLength,
+        maxLength: enableMaxLength ? maxLength : null,
       },
       () => {
         showStatus("设置已保存", "success");
@@ -162,20 +196,26 @@ async function fetchCuboxCategories() {
       throw new Error(data.message || "获取分类失败");
     }
 
-    // 合并新旧分类数据，保留描述信息
-    const newCategories = data.data.map((category) => {
-      const existingCategory = categories.find((c) => c.groupId === category.groupId);
-      return {
-        ...category,
-        description: existingCategory?.description || "",
-      };
+    // 保存现有的描述信息
+    const existingDescriptions = {};
+    categories.forEach((category) => {
+      if (category.description) {
+        existingDescriptions[category.groupId] = category.description;
+      }
     });
+
+    // 合并新旧分类数据，保留描述信息
+    const newCategories = data.data.map((category) => ({
+      ...category,
+      description: existingDescriptions[category.groupId] || "",
+    }));
 
     // 更新分类数据
     categories = newCategories;
 
     // 保存到存储
     await chrome.storage.local.set({ categories });
+    console.log("Saved updated categories:", categories);
 
     // 重新渲染分类列表
     renderCategories();
@@ -192,9 +232,13 @@ async function fetchCuboxCategories() {
 
 function renderCategories() {
   const container = document.getElementById("categoriesList");
-  container.innerHTML = categories
+
+  // 过滤掉没有标题的分类，但只用于显示
+  const validCategories = categories.filter((category) => category.groupName && category.groupName.trim());
+
+  container.innerHTML = validCategories
     .map(
-      (category, index) => `
+      (category) => `
     <tr>
       <td>
         <div class="category-name">${category.groupName}</div>
@@ -204,33 +248,88 @@ function renderCategories() {
         <textarea
           class="description-input"
           placeholder="添加分类描述，帮助 AI 更准确地进行分类..."
-          data-index="${index}"
-          onchange="window.updateDescription(${index}, this.value)"
+          data-group-id="${category.groupId}"
         >${category.description || ""}</textarea>
       </td>
     </tr>
   `
     )
     .join("");
+
+  // 更新分类数量状态
+  const categoryStatus = document.getElementById("categoryStatus");
+  if (categoryStatus) {
+    categoryStatus.textContent = `共 ${validCategories.length} 个分类`;
+    categoryStatus.className = "status success";
+  }
+
+  // 为所有 textarea 添加事件监听器
+  document.querySelectorAll(".description-input").forEach((textarea) => {
+    // 自动调整高度
+    autoResizeTextarea(textarea);
+
+    // 添加输入事件监听器
+    textarea.addEventListener("input", () => {
+      autoResizeTextarea(textarea);
+    });
+
+    // 添加失焦事件监听器
+    textarea.addEventListener("blur", () => {
+      const groupId = textarea.dataset.groupId;
+      updateDescription(groupId, textarea.value);
+    });
+  });
 }
 
-// 需要在全局作用域定义，这样 HTML 中的 onchange 事件才能访问到
-window.updateDescription = function (index, value) {
-  categories[index].description = value;
-};
+// 修改为普通函数
+function updateDescription(groupId, value) {
+  // 在完整的 categories 数组中查找和更新
+  const category = categories.find((c) => c.groupId === groupId);
+  if (category) {
+    category.description = value;
+    console.log(`Updating description for category ${groupId}:`, value);
 
-function saveCategories() {
-  chrome.storage.local.set({ categories }, () => {
-    showStatus("分类设置已保存", "success", true);
-  });
+    // 立即保存到 storage
+    chrome.storage.local.set({ categories }, () => {
+      console.log("Categories saved after description update:", categories);
+      showStatus("描述已保存", "success", true);
+    });
+  }
+}
+
+// 自动调整 textarea 高度的函数
+function autoResizeTextarea(textarea) {
+  // 设置一个较小的初始高度
+  textarea.style.height = "32px";
+
+  // 计算实际需要的高度
+  const scrollHeight = textarea.scrollHeight;
+
+  // 如果内容只有一行，保持最小高度
+  if (scrollHeight <= 32) {
+    textarea.style.height = "32px";
+  } else {
+    textarea.style.height = scrollHeight + "px";
+  }
 }
 
 function showStatus(message, type, isCategory = false) {
   const status = document.getElementById(isCategory ? "categoryStatus" : "status");
+  const originalText = status.textContent;
+  const isCountMessage = originalText.includes("共") && originalText.includes("个分类");
+
   status.textContent = message;
   status.className = `status ${type}`;
 
-  setTimeout(() => {
-    status.className = "status";
-  }, 3000);
+  if (!isCountMessage) {
+    setTimeout(() => {
+      status.className = "status";
+      // 如果是分类状态，且之前显示的是分类数量，则恢复显示分类数量
+      if (isCategory && categories.length > 0) {
+        const validCategories = categories.filter((category) => category.groupName && category.groupName.trim());
+        status.textContent = `共 ${validCategories.length} 个分类`;
+        status.className = "status success";
+      }
+    }, 3000);
+  }
 }

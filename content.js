@@ -15,9 +15,13 @@ function getCuboxToken() {
 
 // 添加 AI 分类按钮
 function addClassifyButton() {
+  // 判断是否是新版页面
+  const isNewVersion = location.href.includes("/cards/");
+  const readerSelector = isNewVersion ? "#reader" : "#cubox-reader";
+
   // 等待 reader div 加载完成
   const waitForReader = setInterval(() => {
-    const readerDiv = document.querySelector("#reader");
+    const readerDiv = document.querySelector(readerSelector);
     if (readerDiv) {
       clearInterval(waitForReader);
 
@@ -35,7 +39,7 @@ function addClassifyButton() {
       // Cubox 风格的按钮样式
       button.style.cssText = `
         position: absolute;
-        top: 20px;
+        top: ${isNewVersion ? "20px" : "80px"};
         right: 20px;
         height: 32px;
         padding: 0 12px;
@@ -77,7 +81,7 @@ function addClassifyButton() {
 
       // 添加点击事件
       button.addEventListener("click", () => {
-        const cardIdMatch = location.href.match(/\/cards\/(\d+)/);
+        const cardIdMatch = location.href.match(/\/cards\/(\d+)/) || location.href.match(/\/my\/card\?id=(\d+)/);
         if (cardIdMatch) {
           button.disabled = true;
           button.style.opacity = "0.5";
@@ -98,7 +102,7 @@ function addClassifyButton() {
       const suggestionBox = document.querySelector(".cubox-ai-suggestions");
       if (suggestionBox) {
         suggestionBox.style.position = "absolute";
-        suggestionBox.style.top = "60px";
+        suggestionBox.style.top = isNewVersion ? "60px" : "120px";
         suggestionBox.style.right = "20px";
       }
     }
@@ -129,12 +133,12 @@ function checkAndProcessPage() {
     existingContainer.remove();
   }
 
-  const cardIdMatch = location.href.match(/\/cards\/(\d+)/);
+  // 匹配两种不同格式的 URL
+  const cardIdMatch = location.href.match(/\/cards\/(\d+)/) || location.href.match(/\/my\/card\?id=(\d+)/);
   console.log("Card ID match:", cardIdMatch);
 
   if (cardIdMatch) {
     console.log("Found card ID:", cardIdMatch[1]);
-    // 只添加按钮，不自动获取文章
     addClassifyButton();
   }
 }
@@ -158,8 +162,8 @@ async function fetchArticleDetails(cardId, button) {
         accept: "*/*",
         "content-type": "application/x-www-form-urlencoded",
         authorization: token,
-        origin: "https://beta.cubox.pro",
-        referer: "https://beta.cubox.pro/",
+        origin: "https://cubox.pro",
+        referer: "https://cubox.pro/",
       },
       body: "markAsRead=true",
     });
@@ -218,14 +222,27 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 });
 
 function showSuggestions(suggestions) {
+  // 过滤掉没有标题的分类
+  const validSuggestions = suggestions.filter((suggestion) => suggestion.groupName && suggestion.groupName.trim());
+
+  // 如果没有有效的建议，直接返回
+  if (validSuggestions.length === 0) {
+    showToast("未找到合适的分类建议", "error");
+    return;
+  }
+
   // 移除可能已存在的建议框
   const existingContainer = document.querySelector(".cubox-ai-suggestions");
   if (existingContainer) {
     existingContainer.remove();
   }
 
+  // 判断是否是新版页面
+  const isNewVersion = location.href.includes("/cards/");
+  const readerSelector = isNewVersion ? "#reader" : "#cubox-reader";
+
   // 获取 reader div
-  const readerDiv = document.querySelector("#reader");
+  const readerDiv = document.querySelector(readerSelector);
   if (!readerDiv) return;
 
   // 创建分类建议UI
@@ -233,7 +250,7 @@ function showSuggestions(suggestions) {
   container.className = "cubox-ai-suggestions";
   container.style.cssText = `
     position: absolute;
-    top: 60px;
+    top: ${isNewVersion ? "60px" : "120px"};
     right: 20px;
     background: rgba(255, 255, 255, 0.8);
     backdrop-filter: blur(30px);
@@ -270,10 +287,10 @@ function showSuggestions(suggestions) {
         height: 18px;
         display: flex;
         align-items: center;
-      ">${suggestions.length}</span>
+      ">${validSuggestions.length}</span>
     </div>
     <div class="suggestions-list" style="display: flex; flex-direction: column; gap: 4px; padding: 4px;">
-      ${suggestions
+      ${validSuggestions
         .map(
           (suggestion) => `
         <button class="suggestion-btn" data-group-id="${suggestion.groupId}" style="
@@ -322,7 +339,10 @@ function showSuggestions(suggestions) {
 }
 
 async function applyClassification(groupId) {
-  const cardId = location.href.match(/\/cards\/(\d+)/)[1];
+  // 从 URL 中获取 cardId，支持两种格式
+  const cardIdMatch = location.href.match(/\/cards\/(\d+)/) || location.href.match(/\/my\/card\?id=(\d+)/);
+  const cardId = cardIdMatch[1];
+
   try {
     const response = await fetch("https://cubox.pro/c/api/v3/search_engine/update", {
       method: "POST",
@@ -346,7 +366,7 @@ function showToast(message, type = "error") {
   const toast = document.createElement("div");
   toast.style.cssText = `
     position: fixed;
-    bottom: 20px;
+    bottom: 10px;
     left: 50%;
     transform: translateX(-50%);
     padding: 2px 8px;
