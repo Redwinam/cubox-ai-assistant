@@ -32,6 +32,50 @@ document.addEventListener("DOMContentLoaded", () => {
       showStatus("设置已保存", "success");
     });
   });
+
+  // 绑定快捷键总开关事件
+  const enableHotkeys = document.getElementById("enableHotkeys");
+  const hotkeysSettings = document.getElementById("hotkeysSettings");
+
+  enableHotkeys.addEventListener("change", () => {
+    hotkeysSettings.style.display = enableHotkeys.checked ? "block" : "none";
+  });
+
+  // 绑定快捷键输入框事件
+  const hotkeyInputs = document.querySelectorAll(".hotkey-input");
+  hotkeyInputs.forEach((input) => {
+    input.addEventListener("keydown", (e) => {
+      e.preventDefault();
+
+      // 构建快捷键组合字符串
+      let keyCombo = [];
+      if (e.ctrlKey) keyCombo.push("Ctrl");
+      if (e.altKey) keyCombo.push("Alt");
+      if (e.shiftKey) keyCombo.push("Shift");
+      if (e.metaKey) keyCombo.push("Meta"); // Command 键 (Mac)
+
+      // 添加主键
+      const key = e.key;
+      // 如果是修饰键本身，不添加
+      if (!["Control", "Alt", "Shift", "Meta"].includes(key)) {
+        // 如果是功能键，直接使用
+        if (key.startsWith("F") && /F\d+/.test(key)) {
+          keyCombo.push(key);
+        } else if (key.length === 1) {
+          // 如果是单个字符，转换为大写
+          keyCombo.push(key.toUpperCase());
+        }
+      }
+
+      // 更新输入框的值
+      if (keyCombo.length > 0) {
+        input.value = keyCombo.join("+");
+      }
+    });
+  });
+
+  // 添加快捷键保存按钮事件
+  document.getElementById("saveHotkeysButton").addEventListener("click", saveHotkeySettings);
 });
 
 function initializeTabs() {
@@ -51,37 +95,70 @@ function initializeTabs() {
 }
 
 function loadSettings() {
-  chrome.storage.local.get(["apiKey", "apiEndpoint", "model", "categories", "enableMaxLength", "maxLength", "enableTags"], (result) => {
-    if (result.apiKey) {
-      document.getElementById("apiKey").value = result.apiKey;
-    }
-    if (result.apiEndpoint) {
-      document.getElementById("apiEndpoint").value = result.apiEndpoint;
-    }
-    if (result.model) {
-      document.getElementById("model").value = result.model;
-    }
-    if (result.categories) {
-      categories = result.categories;
-      renderCategories();
-    }
+  chrome.storage.local.get(
+    [
+      "apiKey",
+      "apiEndpoint",
+      "model",
+      "categories",
+      "enableMaxLength",
+      "maxLength",
+      "enableTags",
+      "enableHotkeys",
+      "enableStarHotkey",
+      "starHotkey",
+      "enableArchiveHotkey",
+      "archiveHotkey",
+      "enableDeleteHotkey",
+      "deleteHotkey",
+    ],
+    (result) => {
+      if (result.apiKey) {
+        document.getElementById("apiKey").value = result.apiKey;
+      }
+      if (result.apiEndpoint) {
+        document.getElementById("apiEndpoint").value = result.apiEndpoint;
+      }
+      if (result.model) {
+        document.getElementById("model").value = result.model;
+      }
+      if (result.categories) {
+        categories = result.categories;
+        renderCategories();
+      }
 
-    // 加载字数限制设置
-    const enableMaxLength = document.getElementById("enableMaxLength");
-    const maxLength = document.getElementById("maxLength");
-    const lengthInput = maxLength.parentElement;
+      // 加载字数限制设置
+      const enableMaxLength = document.getElementById("enableMaxLength");
+      const maxLength = document.getElementById("maxLength");
+      const lengthInput = maxLength.parentElement;
 
-    enableMaxLength.checked = result.enableMaxLength || false;
-    maxLength.disabled = !enableMaxLength.checked;
-    lengthInput.classList.toggle("disabled", !enableMaxLength.checked);
-    if (result.maxLength) {
-      maxLength.value = result.maxLength;
+      enableMaxLength.checked = result.enableMaxLength || false;
+      maxLength.disabled = !enableMaxLength.checked;
+      lengthInput.classList.toggle("disabled", !enableMaxLength.checked);
+      if (result.maxLength) {
+        maxLength.value = result.maxLength;
+      }
+
+      // 加载标签设置
+      const enableTags = document.getElementById("enableTags");
+      enableTags.checked = result.enableTags || false;
+
+      // 加载快捷键设置
+      const enableHotkeys = document.getElementById("enableHotkeys");
+      const hotkeysSettings = document.getElementById("hotkeysSettings");
+
+      enableHotkeys.checked = result.enableHotkeys || false;
+      hotkeysSettings.style.display = enableHotkeys.checked ? "block" : "none";
+
+      // 加载各个快捷键设置
+      document.getElementById("enableStarHotkey").checked = result.enableStarHotkey || false;
+      document.getElementById("starHotkey").value = result.starHotkey || "S";
+      document.getElementById("enableArchiveHotkey").checked = result.enableArchiveHotkey || false;
+      document.getElementById("archiveHotkey").value = result.archiveHotkey || "A";
+      document.getElementById("enableDeleteHotkey").checked = result.enableDeleteHotkey || false;
+      document.getElementById("deleteHotkey").value = result.deleteHotkey || "D";
     }
-
-    // 加载标签设置
-    const enableTags = document.getElementById("enableTags");
-    enableTags.checked = result.enableTags || false;
-  });
+  );
 }
 
 function saveSettings() {
@@ -91,6 +168,13 @@ function saveSettings() {
   const enableMaxLength = document.getElementById("enableMaxLength").checked;
   const maxLength = document.getElementById("maxLength").value;
   const enableTags = document.getElementById("enableTags").checked;
+  const enableHotkeys = document.getElementById("enableHotkeys").checked;
+  const enableStarHotkey = document.getElementById("enableStarHotkey").checked;
+  const starHotkey = document.getElementById("starHotkey").value;
+  const enableArchiveHotkey = document.getElementById("enableArchiveHotkey").checked;
+  const archiveHotkey = document.getElementById("archiveHotkey").value;
+  const enableDeleteHotkey = document.getElementById("enableDeleteHotkey").checked;
+  const deleteHotkey = document.getElementById("deleteHotkey").value;
 
   try {
     // 验证必填字段
@@ -110,6 +194,19 @@ function saveSettings() {
       }
     }
 
+    // 验证快捷键是否重复
+    if (enableHotkeys) {
+      const enabledHotkeys = [];
+      if (enableStarHotkey) enabledHotkeys.push(starHotkey);
+      if (enableArchiveHotkey) enabledHotkeys.push(archiveHotkey);
+      if (enableDeleteHotkey) enabledHotkeys.push(deleteHotkey);
+
+      const uniqueHotkeys = new Set(enabledHotkeys);
+      if (uniqueHotkeys.size !== enabledHotkeys.length) {
+        throw new Error("快捷键不能重复");
+      }
+    }
+
     // 保存设置
     chrome.storage.local.set(
       {
@@ -119,6 +216,13 @@ function saveSettings() {
         enableMaxLength,
         maxLength: enableMaxLength ? maxLength : null,
         enableTags,
+        enableHotkeys,
+        enableStarHotkey,
+        starHotkey,
+        enableArchiveHotkey,
+        archiveHotkey,
+        enableDeleteHotkey,
+        deleteHotkey,
       },
       () => {
         showStatus("设置已保存", "success");
@@ -330,8 +434,8 @@ function autoResizeTextarea(textarea) {
   }
 }
 
-function showStatus(message, type, isCategory = false) {
-  const status = document.getElementById(isCategory ? "categoryStatus" : "status");
+function showStatus(message, type, isCategory = false, elementId = "status") {
+  const status = document.getElementById(elementId);
   const originalText = status.textContent;
   const isCountMessage = originalText.includes("共") && originalText.includes("个分类");
 
@@ -340,6 +444,7 @@ function showStatus(message, type, isCategory = false) {
 
   if (!isCountMessage) {
     setTimeout(() => {
+      status.textContent = "";
       status.className = "status";
       // 如果是分类状态，且之前显示的是分类数量，则恢复显示分类数量
       if (isCategory && categories.length > 0) {
@@ -348,5 +453,50 @@ function showStatus(message, type, isCategory = false) {
         status.className = "status success";
       }
     }, 3000);
+  }
+}
+
+// 添加保存快捷键设置的函数
+function saveHotkeySettings() {
+  const enableHotkeys = document.getElementById("enableHotkeys").checked;
+  const enableStarHotkey = document.getElementById("enableStarHotkey").checked;
+  const starHotkey = document.getElementById("starHotkey").value;
+  const enableArchiveHotkey = document.getElementById("enableArchiveHotkey").checked;
+  const archiveHotkey = document.getElementById("archiveHotkey").value;
+  const enableDeleteHotkey = document.getElementById("enableDeleteHotkey").checked;
+  const deleteHotkey = document.getElementById("deleteHotkey").value;
+
+  try {
+    // 验证快捷键是否重复
+    if (enableHotkeys) {
+      const enabledHotkeys = [];
+      if (enableStarHotkey) enabledHotkeys.push(starHotkey);
+      if (enableArchiveHotkey) enabledHotkeys.push(archiveHotkey);
+      if (enableDeleteHotkey) enabledHotkeys.push(deleteHotkey);
+
+      const uniqueHotkeys = new Set(enabledHotkeys);
+      if (uniqueHotkeys.size !== enabledHotkeys.length) {
+        showStatus("快捷键不能重复", "error", false, "hotkeyStatus");
+        return;
+      }
+    }
+
+    // 保存设置
+    chrome.storage.local.set(
+      {
+        enableHotkeys,
+        enableStarHotkey,
+        starHotkey,
+        enableArchiveHotkey,
+        archiveHotkey,
+        enableDeleteHotkey,
+        deleteHotkey,
+      },
+      () => {
+        showStatus("快捷键设置已保存", "success", false, "hotkeyStatus");
+      }
+    );
+  } catch (error) {
+    showStatus(error.message, "error", false, "hotkeyStatus");
   }
 }

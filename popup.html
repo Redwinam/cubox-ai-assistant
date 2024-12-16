@@ -71,16 +71,6 @@
         bottom: 20px;
         z-index: 1000;
       }
-      .status {
-        padding: 8px 16px;
-        border-radius: 100px;
-        font-size: 14px;
-        backdrop-filter: blur(50px);
-        -webkit-backdrop-filter: blur(50px);
-        background: rgba(255, 255, 255, 0.8);
-        border: 0.8px solid rgba(0, 0, 0, 0.05);
-        display: none;
-      }
       .success {
         color: var(--brand-theme);
         display: block;
@@ -354,14 +344,20 @@
       }
 
       .button-group .status {
-        margin-right: auto;
+        margin-left: auto;
         position: static;
+        display: none;
+        padding: 8px 12px;
+        border-radius: 100px;
+        font-size: 13px;
+        backdrop-filter: blur(50px);
+        -webkit-backdrop-filter: blur(50px);
+        background: rgba(255, 255, 255, 0.8);
+        border: 0.8px solid rgba(0, 0, 0, 0.05);
+      }
+
+      .button-group .status:not(:empty) {
         display: block;
-        background: none;
-        border: none;
-        backdrop-filter: none;
-        -webkit-backdrop-filter: none;
-        padding: 0;
       }
 
       .button-group .status.success {
@@ -370,6 +366,67 @@
 
       .button-group .status.error {
         color: #dc3545;
+      }
+
+      .hotkey-input {
+        padding: 4px 8px;
+        border: 0.8px solid var(--content-block-1);
+        border-radius: 4px;
+        font-size: 14px;
+        background: var(--content-block-1);
+        font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+        text-transform: uppercase;
+      }
+
+      .hotkey-input:focus {
+        outline: none;
+        border-color: var(--brand-theme30);
+      }
+
+      .hotkey-row:not(:last-child) {
+        margin-bottom: 12px;
+      }
+
+      #hotkeysSettings {
+        margin-top: 12px;
+        display: none;
+        border-top: 0.8px solid rgba(0, 0, 0, 0.05);
+        padding-top: 12px;
+      }
+
+      .hotkey-row {
+        display: flex;
+        align-items: center;
+        margin-bottom: 8px;
+      }
+
+      .hotkey-row:last-child {
+        margin-bottom: 0;
+      }
+
+      .hotkey-label {
+        color: var(--content-normal);
+        font-size: 14px;
+        width: 80px;
+        margin-right: 12px;
+      }
+
+      .hotkey-input {
+        padding: 4px 8px;
+        border: 0.8px solid var(--content-block-1);
+        border-radius: 4px;
+        font-size: 14px;
+        background: var(--content-block-1);
+        font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+        text-transform: uppercase;
+        width: 120px;
+        text-align: center;
+        margin-left: 12px;
+      }
+
+      .hotkey-input:focus {
+        outline: none;
+        border-color: var(--brand-theme30);
       }
     </style>
   </head>
@@ -380,6 +437,7 @@
       <div class="tabs">
         <button class="tab active" data-tab="basic">基本设置</button>
         <button class="tab" data-tab="categories">分类管理</button>
+        <button class="tab" data-tab="hotkeys">快捷键</button>
       </div>
 
       <div id="basic" class="tab-content active">
@@ -460,7 +518,56 @@
 
         <div class="button-group" style="margin-top: 15px">
           <button id="refreshCategories" class="primary-button" style="margin-right: auto">从 Cubox 更新分类</button>
-          <div id="categoryStatus" class="status" style="margin-left: auto"></div>
+          <div id="categoryStatus" class="status"></div>
+        </div>
+      </div>
+
+      <div id="hotkeys" class="tab-content">
+        <div class="form-group">
+          <div class="form-row">
+            <label class="form-label">快捷键</label>
+            <div class="length-limit-control">
+              <label class="toggle">
+                <input type="checkbox" id="enableHotkeys" />
+                <span class="toggle-slider"></span>
+              </label>
+              <small style="color: var(--content-normal); margin-left: 8px">启用键盘快捷键</small>
+            </div>
+          </div>
+
+          <div id="hotkeysSettings" style="margin-top: 12px; display: none">
+            <div class="hotkey-row">
+              <span class="hotkey-label">切换星标</span>
+              <label class="toggle">
+                <input type="checkbox" id="enableStarHotkey" />
+                <span class="toggle-slider"></span>
+              </label>
+              <input type="text" id="starHotkey" class="hotkey-input" placeholder="按键" value="S" />
+            </div>
+
+            <div class="hotkey-row">
+              <span class="hotkey-label">归档内容</span>
+              <label class="toggle">
+                <input type="checkbox" id="enableArchiveHotkey" />
+                <span class="toggle-slider"></span>
+              </label>
+              <input type="text" id="archiveHotkey" class="hotkey-input" placeholder="按键" value="A" />
+            </div>
+
+            <div class="hotkey-row">
+              <span class="hotkey-label">删除内容</span>
+              <label class="toggle">
+                <input type="checkbox" id="enableDeleteHotkey" />
+                <span class="toggle-slider"></span>
+              </label>
+              <input type="text" id="deleteHotkey" class="hotkey-input" placeholder="按键" value="D" />
+            </div>
+          </div>
+        </div>
+
+        <div class="button-group">
+          <div id="hotkeyStatus" class="status" style="margin: 0"></div>
+          <button id="saveHotkeysButton" class="primary-button">保存设置</button>
         </div>
       </div>
     </div>

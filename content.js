@@ -34,7 +34,17 @@ function addClassifyButton() {
       // 创建新按钮
       const button = document.createElement("button");
       button.className = "ai-classify-button";
-      button.innerHTML = "🤖 AI 分类";
+      button.innerHTML = `
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 4px;">
+          <path d="M12 8V4H8"/>
+          <rect width="16" height="12" x="4" y="8" rx="2"/>
+          <path d="M2 14h2"/>
+          <path d="M20 14h2"/>
+          <path d="M15 13v2"/>
+          <path d="M9 13v2"/>
+        </svg>
+        AI 分类
+      `;
 
       // Cubox 风格的按钮样式
       button.style.cssText = `
@@ -85,7 +95,17 @@ function addClassifyButton() {
         if (cardIdMatch) {
           button.disabled = true;
           button.style.opacity = "0.5";
-          button.innerHTML = "🤖 分析中...";
+          button.innerHTML = `
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 4px;">
+              <path d="M12 8V4H8"/>
+              <rect width="16" height="12" x="4" y="8" rx="2"/>
+              <path d="M2 14h2"/>
+              <path d="M20 14h2"/>
+              <path d="M15 13v2"/>
+              <path d="M9 13v2"/>
+            </svg>
+            分析中...
+          `;
           fetchArticleDetails(cardIdMatch[1], button);
         }
       });
@@ -165,7 +185,6 @@ async function fetchArticleDetails(cardId, button) {
         origin: "https://cubox.pro",
         referer: "https://cubox.pro/",
       },
-      body: "markAsRead=true",
     });
 
     const data = await response.json();
@@ -204,7 +223,17 @@ function resetButton(button) {
   if (button) {
     button.disabled = false;
     button.style.opacity = "1";
-    button.innerHTML = "🤖 AI 分类";
+    button.innerHTML = `
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 4px;">
+        <path d="M12 8V4H8"/>
+        <rect width="16" height="12" x="4" y="8" rx="2"/>
+        <path d="M2 14h2"/>
+        <path d="M20 14h2"/>
+        <path d="M15 13v2"/>
+        <path d="M9 13v2"/>
+      </svg>
+      AI 分类
+    `;
     button.style.background = "radial-gradient(100% 100% at 50% 100%, rgba(255, 255, 255, 0) 0%, rgba(189, 138, 184, 0.25) 100%), #2c46f1";
     button.style.boxShadow = "0 4px 8px 0 rgba(0, 0, 0, 0.06), 0 -2px 0 0 rgba(0, 0, 0, 0.15) inset";
   }
@@ -484,6 +513,109 @@ function showSuggestions(suggestions, tags = []) {
   });
 }
 
+// 切换星标状态
+async function toggleStar(cardId) {
+  try {
+    // 先获取当前文章信息
+    const response = await fetch(`https://cubox.pro/c/api/norm/card/visit/${cardId}`, {
+      method: "POST",
+      headers: {
+        accept: "*/*",
+        "content-type": "application/x-www-form-urlencoded",
+        authorization: getCuboxToken(),
+        origin: "https://cubox.pro",
+        referer: "https://cubox.pro/",
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error("获取文章信息失败");
+    }
+
+    const data = await response.json();
+    const currentStarStatus = data.data.hasStar || false;
+
+    // 发送切换请求
+    const toggleResponse = await fetch("https://cubox.pro/c/api/v3/search_engine/update", {
+      method: "POST",
+      headers: {
+        accept: "*/*",
+        "content-type": "application/x-www-form-urlencoded",
+        authorization: getCuboxToken(),
+        origin: "https://cubox.pro",
+        referer: "https://cubox.pro/",
+      },
+      body: `userSearchEngineID=${cardId}&starTarget=${!currentStarStatus}`,
+    });
+
+    if (toggleResponse.ok) {
+      showToast(currentStarStatus ? "已取消星标" : "已添加星标", "success");
+    } else {
+      throw new Error("切换星标失败");
+    }
+  } catch (error) {
+    console.error("切换星标失败:", error);
+    showToast("切换星标失败，请重试");
+  }
+}
+
+// 归档文章
+async function toggleArchive(cardId) {
+  try {
+    // 直接发送归档请求
+    const response = await fetch("https://cubox.pro/c/api/v3/search_engine/update", {
+      method: "POST",
+      headers: {
+        accept: "*/*",
+        "content-type": "application/x-www-form-urlencoded",
+        authorization: getCuboxToken(),
+        origin: "https://cubox.pro",
+        referer: "https://cubox.pro/",
+      },
+      body: `userSearchEngineID=${cardId}&archiving=true`,
+    });
+
+    if (response.ok) {
+      showToast("已归档", "success");
+    } else {
+      throw new Error("归档失败");
+    }
+  } catch (error) {
+    console.error("归档失败:", error);
+    showToast("归档失败，请重试");
+  }
+}
+
+// 删除文章
+async function deleteArticle(cardId) {
+  try {
+    const response = await fetch(`https://cubox.pro/c/api/search_engine/delete/${cardId}`, {
+      method: "POST",
+      headers: {
+        accept: "*/*",
+        "content-type": "application/x-www-form-urlencoded",
+        authorization: getCuboxToken(),
+        origin: "https://cubox.pro",
+        referer: "https://cubox.pro/",
+      },
+    });
+
+    if (response.ok) {
+      showToast("已删除", "success");
+      // 延迟一下再跳转，让用户看到提示
+      setTimeout(() => {
+        window.location.href = "https://cubox.pro/my/inbox";
+      }, 1000);
+    } else {
+      throw new Error("删除失败");
+    }
+  } catch (error) {
+    console.error("删除失败:", error);
+    showToast("删除失败，请重试");
+  }
+}
+
+// 应用分类
 async function applyClassification(groupId) {
   // 从 URL 中获取 cardId，支持两种格式
   const cardIdMatch = location.href.match(/\/cards\/(\d+)/) || location.href.match(/\/my\/card\?id=(\d+)/);
@@ -493,14 +625,19 @@ async function applyClassification(groupId) {
     const response = await fetch("https://cubox.pro/c/api/v3/search_engine/update", {
       method: "POST",
       headers: {
+        accept: "*/*",
         "content-type": "application/x-www-form-urlencoded",
         authorization: getCuboxToken(),
+        origin: "https://cubox.pro",
+        referer: "https://cubox.pro/",
       },
       body: `userSearchEngineID=${cardId}&groupId=${groupId}`,
     });
 
     if (response.ok) {
-      showToast("分类成功！");
+      showToast("分类成功！", "success");
+    } else {
+      throw new Error("分类失败");
     }
   } catch (error) {
     console.error("应用分类失败:", error);
@@ -508,6 +645,7 @@ async function applyClassification(groupId) {
   }
 }
 
+// 应用标签
 async function applyTag(tagName) {
   // 从 URL 中获取 cardId，支持两种格式
   const cardIdMatch = location.href.match(/\/cards\/(\d+)/) || location.href.match(/\/my\/card\?id=(\d+)/);
@@ -519,8 +657,11 @@ async function applyTag(tagName) {
     const response = await fetch("https://cubox.pro/c/api/v3/search_engine/update", {
       method: "POST",
       headers: {
+        accept: "*/*",
         "content-type": "application/x-www-form-urlencoded",
         authorization: getCuboxToken(),
+        origin: "https://cubox.pro",
+        referer: "https://cubox.pro/",
       },
       body: `userSearchEngineID=${cardId}&linkedTagNames=${encodeURIComponent(JSON.stringify([{ name: tagName }]))}`,
     });
@@ -560,3 +701,51 @@ function showToast(message, type = "error") {
   document.body.appendChild(toast);
   setTimeout(() => toast.remove(), 3000);
 }
+
+// 添加快捷键处理函数
+function handleHotkey(event) {
+  // 如果是在输入框中，不处理快捷键
+  if (event.target.tagName === "INPUT" || event.target.tagName === "TEXTAREA") {
+    return;
+  }
+
+  // 获取当前文章ID
+  const cardIdMatch = location.href.match(/\/cards\/(\d+)/) || location.href.match(/\/my\/card\?id=(\d+)/);
+  if (!cardIdMatch) return;
+
+  const cardId = cardIdMatch[1];
+
+  // 构建按键组合字符串
+  let keyCombo = "";
+  if (event.ctrlKey) keyCombo += "Ctrl+";
+  if (event.altKey) keyCombo += "Alt+";
+  if (event.shiftKey) keyCombo += "Shift+";
+  if (event.metaKey) keyCombo += "Meta+"; // Command 键 (Mac)
+
+  // 添加主键
+  // 如果是功能键，直接使用 key
+  if (event.key.startsWith("F") && /F\d+/.test(event.key)) {
+    keyCombo += event.key;
+  } else {
+    // 否则转换为大写
+    keyCombo += event.key.toUpperCase();
+  }
+
+  // 获取快捷键设置
+  chrome.storage.local.get(["enableHotkeys", "enableStarHotkey", "starHotkey", "enableArchiveHotkey", "archiveHotkey", "enableDeleteHotkey", "deleteHotkey"], async (result) => {
+    if (!result.enableHotkeys) return;
+
+    if (result.enableStarHotkey && keyCombo === result.starHotkey) {
+      await toggleStar(cardId);
+    } else if (result.enableArchiveHotkey && keyCombo === result.archiveHotkey) {
+      await toggleArchive(cardId);
+    } else if (result.enableDeleteHotkey && keyCombo === result.deleteHotkey) {
+      if (confirm("确定要删除这篇文章吗？")) {
+        await deleteArticle(cardId);
+      }
+    }
+  });
+}
+
+// 添加快捷键监听
+document.addEventListener("keydown", handleHotkey);
