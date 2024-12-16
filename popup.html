@@ -243,8 +243,8 @@
         gap: 20px;
       }
 
-      .form-row label {
-        flex: 0 0 80px;
+      .form-label {
+        flex: 0 0 64px;
         text-align: left;
       }
 
@@ -278,12 +278,16 @@
         display: inline-block;
         width: 32px;
         height: 20px;
+        cursor: pointer;
+        flex-shrink: 0;
       }
 
       .toggle input {
         opacity: 0;
         width: 0;
         height: 0;
+        position: absolute;
+        cursor: pointer;
       }
 
       .toggle-slider {
@@ -297,6 +301,7 @@
         transition: 0.4s;
         border-radius: 20px;
         width: 32px;
+        pointer-events: none;
       }
 
       .toggle-slider:before {
@@ -309,6 +314,7 @@
         background-color: white;
         transition: 0.4s;
         border-radius: 50%;
+        pointer-events: none;
       }
 
       .toggle input:checked + .toggle-slider {
@@ -346,6 +352,25 @@
         margin-top: 4px;
         margin-left: 100px;
       }
+
+      .button-group .status {
+        margin-right: auto;
+        position: static;
+        display: block;
+        background: none;
+        border: none;
+        backdrop-filter: none;
+        -webkit-backdrop-filter: none;
+        padding: 0;
+      }
+
+      .button-group .status.success {
+        color: var(--brand-theme);
+      }
+
+      .button-group .status.error {
+        color: #dc3545;
+      }
     </style>
   </head>
   <body>
@@ -360,21 +385,21 @@
       <div id="basic" class="tab-content active">
         <div class="form-group">
           <div class="form-row">
-            <label for="apiKey">API Key</label>
+            <label class="form-label" for="apiKey">API Key</label>
             <input type="text" id="apiKey" placeholder="sk-..." />
           </div>
         </div>
 
         <div class="form-group">
           <div class="form-row">
-            <label for="apiEndpoint">API 端点</label>
+            <label class="form-label" for="apiEndpoint">API 端点</label>
             <input type="text" id="apiEndpoint" placeholder="https://api.openai.com/v1/chat/completions" />
           </div>
         </div>
 
         <div class="form-group">
           <div class="form-row">
-            <label for="model">模型名称</label>
+            <label class="form-label" for="model">模型名称</label>
             <div class="input-with-hint">
               <input type="text" id="model" placeholder="gpt-3.5-turbo" />
               <small>例如：gpt-3.5-turbo, chatglm_turbo 等</small>
@@ -384,12 +409,12 @@
 
         <div class="form-group">
           <div class="form-row">
-            <label for="maxLength">字数限制</label>
+            <label class="form-label" for="maxLength">字数限制</label>
             <div class="length-limit-control">
-              <div class="toggle">
+              <label class="toggle">
                 <input type="checkbox" id="enableMaxLength" />
                 <span class="toggle-slider"></span>
-              </div>
+              </label>
               <div class="length-input ${enableMaxLength ? '' : 'disabled'}">
                 <input type="number" id="maxLength" placeholder="2000" disabled />
                 <span class="unit">字</span>
@@ -399,7 +424,21 @@
           <small class="hint">启用后，提交给AI的内容超过字数的部分将被截断。建议设置在 1000-3000 之间</small>
         </div>
 
+        <div class="form-group">
+          <div class="form-row">
+            <label class="form-label" for="enableTags">生成标签</label>
+            <div class="length-limit-control">
+              <label class="toggle">
+                <input type="checkbox" id="enableTags" />
+                <span class="toggle-slider"></span>
+              </label>
+              <small style="color: var(--content-normal); margin-left: 8px">同时为文章生成 5 个标签建议</small>
+            </div>
+          </div>
+        </div>
+
         <div class="button-group">
+          <div id="status" class="status" style="margin: 0"></div>
           <button id="saveButton" class="primary-button">保存设置</button>
         </div>
       </div>
@@ -423,10 +462,6 @@
           <button id="refreshCategories" class="primary-button" style="margin-right: auto">从 Cubox 更新分类</button>
           <div id="categoryStatus" class="status" style="margin-left: auto"></div>
         </div>
-      </div>
-
-      <div class="status-container">
-        <div id="status" class="status"></div>
       </div>
     </div>
 

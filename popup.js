@@ -23,6 +23,15 @@ document.addEventListener("DOMContentLoaded", () => {
       maxLength.value = "2000"; // 默认值
     }
   });
+
+  // 绑定生成标签复选框事件
+  const enableTags = document.getElementById("enableTags");
+  enableTags.addEventListener("change", () => {
+    // 直接保存设置
+    chrome.storage.local.set({ enableTags: enableTags.checked }, () => {
+      showStatus("设置已保存", "success");
+    });
+  });
 });
 
 function initializeTabs() {
@@ -42,7 +51,7 @@ function initializeTabs() {
 }
 
 function loadSettings() {
-  chrome.storage.local.get(["apiKey", "apiEndpoint", "model", "categories", "enableMaxLength", "maxLength"], (result) => {
+  chrome.storage.local.get(["apiKey", "apiEndpoint", "model", "categories", "enableMaxLength", "maxLength", "enableTags"], (result) => {
     if (result.apiKey) {
       document.getElementById("apiKey").value = result.apiKey;
     }
@@ -60,12 +69,18 @@ function loadSettings() {
     // 加载字数限制设置
     const enableMaxLength = document.getElementById("enableMaxLength");
     const maxLength = document.getElementById("maxLength");
+    const lengthInput = maxLength.parentElement;
 
     enableMaxLength.checked = result.enableMaxLength || false;
     maxLength.disabled = !enableMaxLength.checked;
+    lengthInput.classList.toggle("disabled", !enableMaxLength.checked);
     if (result.maxLength) {
       maxLength.value = result.maxLength;
     }
+
+    // 加载标签设置
+    const enableTags = document.getElementById("enableTags");
+    enableTags.checked = result.enableTags || false;
   });
 }
 
@@ -75,6 +90,7 @@ function saveSettings() {
   const model = document.getElementById("model").value.trim();
   const enableMaxLength = document.getElementById("enableMaxLength").checked;
   const maxLength = document.getElementById("maxLength").value;
+  const enableTags = document.getElementById("enableTags").checked;
 
   try {
     // 验证必填字段
@@ -102,6 +118,7 @@ function saveSettings() {
         model: model || "gpt-3.5-turbo",
         enableMaxLength,
         maxLength: enableMaxLength ? maxLength : null,
+        enableTags,
       },
       () => {
         showStatus("设置已保存", "success");

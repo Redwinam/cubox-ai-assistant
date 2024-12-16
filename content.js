@@ -203,7 +203,10 @@ async function fetchArticleDetails(cardId, button) {
 function resetButton(button) {
   if (button) {
     button.disabled = false;
+    button.style.opacity = "1";
     button.innerHTML = "🤖 AI 分类";
+    button.style.background = "radial-gradient(100% 100% at 50% 100%, rgba(255, 255, 255, 0) 0%, rgba(189, 138, 184, 0.25) 100%), #2c46f1";
+    button.style.boxShadow = "0 4px 8px 0 rgba(0, 0, 0, 0.06), 0 -2px 0 0 rgba(0, 0, 0, 0.15) inset";
   }
 }
 
@@ -212,7 +215,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   const button = document.querySelector(".ai-classify-button");
 
   if (message.type === "CLASSIFICATION_SUGGESTIONS") {
-    showSuggestions(message.suggestions);
+    showSuggestions(message.suggestions, message.tags);
     resetButton(button);
   } else if (message.type === "CLASSIFICATION_ERROR") {
     console.error("Classification error:", message.error);
@@ -221,7 +224,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 });
 
-function showSuggestions(suggestions) {
+function showSuggestions(suggestions, tags = []) {
   // 过滤掉没有标题的分类
   const validSuggestions = suggestions.filter((suggestion) => suggestion.groupName && suggestion.groupName.trim());
 
@@ -260,65 +263,132 @@ function showSuggestions(suggestions) {
     border: 3px solid rgba(153, 153, 153, 0.2);
     box-shadow: 0 8px 32px 0 rgba(24, 24, 24, 0.12);
     min-width: 200px;
+    max-width: 300px;
     z-index: 9999;
   `;
 
-  container.innerHTML = `
-    <div style="
-      height: 40px;
-      border-radius: 4px;
-      background: radial-gradient(100% 100% at 50% 100%, rgba(255, 255, 255, 0) 0%, rgba(189, 138, 184, 0.25) 100%), #2c46f1;
-      display: flex;
-      padding: 0 10px;
-      justify-content: space-between;
-      align-items: center;
-      color: #fff;
-      font-size: 14px;
-      font-weight: 600;
-      margin-bottom: 4px;
-    ">
-      <span>推荐分类</span>
-      <span style="
-        background: #fff;
-        color: #6a6a6b;
-        border-radius: 3px;
-        padding: 0 4px;
-        font-size: 12px;
-        height: 18px;
+  // 分类部分
+  const categoriesHtml = `
+    <div class="categories-section" style="margin-bottom: 12px;">
+      <div style="
+        height: 40px;
+        border-radius: 4px;
+        background: radial-gradient(100% 100% at 50% 100%, rgba(255, 255, 255, 0) 0%, rgba(189, 138, 184, 0.25) 100%), #2c46f1;
         display: flex;
+        padding: 0 10px;
+        justify-content: space-between;
         align-items: center;
-      ">${validSuggestions.length}</span>
-    </div>
-    <div class="suggestions-list" style="display: flex; flex-direction: column; gap: 4px; padding: 4px;">
-      ${validSuggestions
-        .map(
-          (suggestion) => `
-        <button class="suggestion-btn" data-group-id="${suggestion.groupId}" style="
-          height: 40px;
-          border-radius: 4px;
-          border: none;
-          background: none;
+        color: #fff;
+        font-size: 14px;
+        font-weight: 600;
+        margin-bottom: 4px;
+      ">
+        <span>推荐分类</span>
+        <span style="
+          background: #fff;
+          color: #6a6a6b;
+          border-radius: 3px;
+          padding: 0 4px;
+          font-size: 12px;
+          height: 18px;
           display: flex;
-          padding: 0 10px;
           align-items: center;
-          color: #191919;
-          font-size: 14px;
-          font-weight: 500;
-          cursor: pointer;
-          width: 100%;
-          text-align: left;
-          border: 1px solid transparent;
-        ">${suggestion.groupName}</button>
-      `
-        )
-        .join("")}
+        ">${validSuggestions.length}</span>
+      </div>
+      <div class="suggestions-list" style="display: flex; flex-direction: column; gap: 4px; padding: 4px;">
+        ${validSuggestions
+          .map(
+            (suggestion) => `
+          <button class="suggestion-btn" data-group-id="${suggestion.groupId}" style="
+            height: 40px;
+            border-radius: 4px;
+            border: none;
+            background: none;
+            display: flex;
+            padding: 0 10px;
+            align-items: center;
+            color: #191919;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            width: 100%;
+            text-align: left;
+            border: 1px solid transparent;
+          ">${suggestion.groupName}</button>
+        `
+          )
+          .join("")}
+      </div>
     </div>
   `;
+
+  // 标签部分
+  const tagsHtml =
+    tags.length > 0
+      ? `
+    <div class="tags-section">
+      <div style="
+        height: 40px;
+        border-radius: 4px;
+        background: radial-gradient(100% 100% at 50% 100%, rgba(255, 255, 255, 0) 0%, rgba(189, 138, 184, 0.25) 100%), #2c46f1;
+        display: flex;
+        padding: 0 10px;
+        justify-content: space-between;
+        align-items: center;
+        color: #fff;
+        font-size: 14px;
+        font-weight: 600;
+        margin-bottom: 4px;
+      ">
+        <span>推荐标签</span>
+        <span style="
+          background: #fff;
+          color: #6a6a6b;
+          border-radius: 3px;
+          padding: 0 4px;
+          font-size: 12px;
+          height: 18px;
+          display: flex;
+          align-items: center;
+        ">${tags.length}</span>
+      </div>
+      <div class="tags-list" style="display: flex; flex-wrap: wrap; gap: 8px; padding: 8px;">
+        ${tags
+          .map(
+            (tag) => `
+          <button class="tag-btn" style="
+            height: 28px;
+            border-radius: 14px;
+            border: none;
+            background: #f2f3f5;
+            display: flex;
+            padding: 0 12px;
+            align-items: center;
+            color: #191919;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            border: 1px solid transparent;
+            max-width: 100%;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            transition: all 0.2s ease;
+          ">${tag}</button>
+        `
+          )
+          .join("")}
+      </div>
+    </div>
+  `
+      : "";
+
+  container.innerHTML = categoriesHtml + tagsHtml;
 
   // 直接将建议框添加到 reader div
   readerDiv.appendChild(container);
 
-  // 添加悬停效果
+  // 添加分类按钮事件
   container.querySelectorAll(".suggestion-btn").forEach((btn) => {
     btn.addEventListener("mouseover", () => {
       btn.style.border = "1px solid rgba(0, 0, 0, 0.05)";
@@ -330,10 +400,86 @@ function showSuggestions(suggestions) {
       btn.style.background = "none";
     });
 
-    btn.addEventListener("click", () => {
+    btn.addEventListener("click", async () => {
       const groupId = btn.dataset.groupId;
-      applyClassification(groupId);
-      container.remove();
+      await applyClassification(groupId);
+
+      // 获取当前的标签功能状态
+      chrome.storage.local.get(["enableTags"], async (result) => {
+        if (!result.enableTags) {
+          // 如果标签功能未启用，直接移除整个建议框
+          const existingContainer = document.querySelector(".cubox-ai-suggestions");
+          if (existingContainer) {
+            existingContainer.remove();
+          }
+          const button = document.querySelector(".ai-classify-button");
+          if (button) {
+            resetButton(button);
+          }
+        } else {
+          // 如果标签功能已启用，只隐藏分类部分
+          const categoriesSection = container.querySelector(".categories-section");
+          if (categoriesSection) {
+            categoriesSection.style.display = "none";
+          }
+        }
+      });
+    });
+  });
+
+  // 添加标签按钮事件
+  container.querySelectorAll(".tag-btn").forEach((btn) => {
+    btn.addEventListener("mouseover", () => {
+      if (!btn.disabled) {
+        btn.style.background = "#e9eaec";
+      }
+    });
+
+    btn.addEventListener("mouseout", () => {
+      if (!btn.disabled) {
+        btn.style.background = "#f2f3f5";
+      }
+    });
+
+    btn.addEventListener("click", async () => {
+      const tagName = btn.textContent.trim();
+      await applyTag(tagName);
+
+      // 获取当前的标签功能状态
+      chrome.storage.local.get(["enableTags"], async (result) => {
+        if (!result.enableTags) {
+          // 如果标签功能未启用，点击标签后关闭整个弹出框并重置按钮
+          const existingContainer = document.querySelector(".cubox-ai-suggestions");
+          if (existingContainer) {
+            existingContainer.remove();
+          }
+          const button = document.querySelector(".ai-classify-button");
+          if (button) {
+            resetButton(button);
+          }
+        } else {
+          // 如果标签功能已启用，保持原有行为
+          btn.style.cssText = `
+            height: 28px;
+            border-radius: 14px;
+            border: none;
+            background: #e8f3ff;
+            display: flex;
+            padding: 0 12px;
+            align-items: center;
+            color: #2c46f1;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: default;
+            max-width: 100%;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            transition: all 0.2s ease;
+          `;
+          btn.disabled = true;
+        }
+      });
     });
   });
 }
@@ -359,6 +505,34 @@ async function applyClassification(groupId) {
   } catch (error) {
     console.error("应用分类失败:", error);
     showToast("分类失败，请重试");
+  }
+}
+
+async function applyTag(tagName) {
+  // 从 URL 中获取 cardId，支持两种格式
+  const cardIdMatch = location.href.match(/\/cards\/(\d+)/) || location.href.match(/\/my\/card\?id=(\d+)/);
+  const cardId = cardIdMatch[1];
+
+  try {
+    // 使用 encodeURIComponent 对标签名进行编码
+    const encodedTagName = encodeURIComponent(tagName);
+    const response = await fetch("https://cubox.pro/c/api/v3/search_engine/update", {
+      method: "POST",
+      headers: {
+        "content-type": "application/x-www-form-urlencoded",
+        authorization: getCuboxToken(),
+      },
+      body: `userSearchEngineID=${cardId}&linkedTagNames=${encodeURIComponent(JSON.stringify([{ name: tagName }]))}`,
+    });
+
+    if (response.ok) {
+      showToast("标签已添加", "success");
+    } else {
+      throw new Error("添加标签失败");
+    }
+  } catch (error) {
+    console.error("添加标签失败:", error);
+    showToast("添加标签失败，请重试");
   }
 }
 

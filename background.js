@@ -38,7 +38,7 @@ chrome.storage.local.get(["categories", "apiKey"], (result) => {
 // 处理分析请求的函数
 async function handleAnalysis(article, tabId) {
   try {
-    const config = await chrome.storage.local.get(["apiKey", "apiEndpoint", "model", "enableMaxLength", "maxLength"]);
+    const config = await chrome.storage.local.get(["apiKey", "apiEndpoint", "model", "enableMaxLength", "maxLength", "enableTags"]);
     console.log("Starting analysis with config:", {
       hasApiKey: !!config.apiKey,
       apiEndpoint: config.apiEndpoint || "https://api.openai.com/v1/chat/completions",
@@ -46,6 +46,7 @@ async function handleAnalysis(article, tabId) {
       categoriesCount: userCategories.length,
       enableMaxLength: config.enableMaxLength,
       maxLength: config.maxLength,
+      enableTags: config.enableTags,
     });
 
     if (!config.apiKey) {
@@ -126,8 +127,8 @@ async function handleAnalysis(article, tabId) {
       throw new Error("Invalid API response format");
     }
 
-    const suggestions = parseAISuggestions(aiResponse.choices[0].message.content);
-    console.log("Parsed suggestions:", suggestions);
+    const { suggestions, tags } = parseAISuggestions(aiResponse.choices[0].message.content);
+    console.log("Parsed results:", { suggestions, tags });
 
     if (suggestions.length === 0) {
       throw new Error("No valid categories found in AI response");
@@ -137,6 +138,7 @@ async function handleAnalysis(article, tabId) {
     chrome.tabs.sendMessage(tabId, {
       type: "CLASSIFICATION_SUGGESTIONS",
       suggestions,
+      tags: config.enableTags ? tags : [],
     });
   } catch (error) {
     console.error("Analysis failed:", error);
@@ -150,24 +152,52 @@ async function handleAnalysis(article, tabId) {
 function parseAISuggestions(aiResponse) {
   console.log("Parsing AI response:", aiResponse);
 
-  // 解析返回的分类ID
-  const groupIds = aiResponse.trim().split("\n").slice(0, 3);
+  // 移除可能的空白字符
+  const cleanResponse = aiResponse.trim();
+
+  // 如果响应包含标签部分，则按标签分割
+  const parts = cleanResponse.includes("标签：") ? cleanResponse.split(/标签：/) : [cleanResponse];
+  const categoryPart = parts[0].trim();
+  const tagsPart = parts[1] ? parts[1].trim() : "";
+
+  // 解析分类ID，过滤掉空行和非ID内容
+  const groupIds = categoryPart
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line && !line.includes("：") && !line.includes(":")); // 过滤掉包含冒号的行（可能是标题行）
+
   console.log("Extracted group IDs:", groupIds);
 
   // 查找对应的分类信息
   const suggestions = groupIds
     .map((groupId) => {
-      const trimmedId = groupId.trim();
-      const category = userCategories.find((cat) => cat.groupId === trimmedId);
+      const category = userCategories.find((cat) => cat.groupId === groupId);
       if (!category) {
-        console.log(`Category not found for ID: ${trimmedId}`);
+        console.log(`Category not found for ID: ${groupId}`);
       }
       return category;
     })
     .filter(Boolean);
 
-  console.log("Final suggestions:", suggestions);
-  return suggestions;
+  // 解析标签
+  let tags = [];
+  if (tagsPart) {
+    tags = tagsPart
+      .split("\n")
+      .map((tag) => tag.trim())
+      .filter((tag) => tag)
+      .slice(0, 5);
+  }
+
+  console.log("Final suggestions:", { categories: suggestions, tags });
+
+  if (suggestions.length === 0) {
+    console.error("No valid categories found in response. Raw response:", cleanResponse);
+    console.error("Extracted group IDs:", groupIds);
+    console.error("Available categories:", userCategories);
+  }
+
+  return { suggestions, tags };
 }
 
 // 构建 AI 提示
@@ -176,7 +206,7 @@ async function buildPrompt(article, categories) {
   const originalLength = content.length;
 
   // 检查是否需要限制内容长度
-  const result = await chrome.storage.local.get(["enableMaxLength", "maxLength"]);
+  const result = await chrome.storage.local.get(["enableMaxLength", "maxLength", "enableTags"]);
   if (result.enableMaxLength && result.maxLength) {
     const maxLength = parseInt(result.maxLength);
     if (content.length > maxLength) {
@@ -185,7 +215,13 @@ async function buildPrompt(article, categories) {
     }
   }
 
-  const prompt = `请根据以下文章内容，从给定的分类列表中选择最合适的3个分类。
+  let prompt = `请根据以下文章内容，从给定的分类列表中选择最合适的3个分类。`;
+
+  if (result.enableTags) {
+    prompt += `同时，请为文章生成5个准确且相关的标签。`;
+  }
+
+  prompt += `
 
 文章标题：${article.title}
 文章描述：${article.description}
@@ -194,7 +230,14 @@ async function buildPrompt(article, categories) {
 可选分类：
 ${categories.map((cat) => `${cat.groupId}: ${cat.groupName}${cat.description ? ` (${cat.description})` : ""}`).join("\n")}
 
-请直接返回三个最匹配的分类ID，每行一个，不要其他任何文字：`;
+${
+  result.enableTags
+    ? `请按以下格式返回：
+分类ID：（每行一个ID）
+
+标签：（每行一个标签，不要带序号或符号）`
+    : `请直接返回三个最匹配的分类ID，每行一个，不要其他任何文字`
+}`;
 
   console.log("Generated prompt:", {
     titleLength: article.title.length,
@@ -204,6 +247,7 @@ ${categories.map((cat) => `${cat.groupId}: ${cat.groupName}${cat.description ? `
     totalPromptLength: prompt.length,
     wasContentTruncated: originalLength !== content.length,
     truncatedAmount: originalLength - content.length,
+    enableTags: result.enableTags,
   });
 
   return prompt;
