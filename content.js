@@ -191,15 +191,28 @@ async function fetchArticleDetails(cardId, button) {
     console.log("API response:", data.code === 200 ? "成功" : "失败", data.code);
 
     if (data.code === 200) {
+      const { title, content, description } = data.data;
+
+      // 检查是否有足够的数据进行分析
+      if (!title && !content && !description) {
+        console.error("文章数据不完整：没有标题和内容");
+        showToast("无法分析：文章没有任何内容");
+        resetButton(button);
+        return;
+      }
+
+      // 准备发送给 AI 的数据
+      const articleData = {
+        title: title || "",
+        content: content || "",
+        description: description || "",
+      };
+
       console.log("Sending article data to background script");
       chrome.runtime.sendMessage(
         {
           type: "ANALYZE_ARTICLE",
-          article: {
-            title: data.data.title,
-            content: data.data.content,
-            description: data.data.description,
-          },
+          article: articleData,
         },
         (response) => {
           if (response && response.status === "processing") {
@@ -253,14 +266,26 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 });
 
-function showSuggestions(suggestions, tags = []) {
+function showSuggestions(suggestions = [], tags = []) {
+  // 确保 suggestions 是数组
+  if (!Array.isArray(suggestions)) {
+    console.error("Invalid suggestions format:", suggestions);
+    showToast("分类建议格式错误", "error");
+    return;
+  }
+
   // 过滤掉没有标题的分类
-  const validSuggestions = suggestions.filter((suggestion) => suggestion.groupName && suggestion.groupName.trim());
+  const validSuggestions = suggestions.filter((suggestion) => suggestion && suggestion.groupName && suggestion.groupName.trim());
 
   // 如果没有有效的建议，直接返回
   if (validSuggestions.length === 0) {
     showToast("未找到合适的分类建议", "error");
     return;
+  }
+
+  // 确保 tags 是数组
+  if (!Array.isArray(tags)) {
+    tags = [];
   }
 
   // 移除可能已存在的建议框
@@ -732,10 +757,15 @@ function handleHotkey(event) {
   }
 
   // 获取快捷键设置
-  chrome.storage.local.get(["enableHotkeys", "enableStarHotkey", "starHotkey", "enableArchiveHotkey", "archiveHotkey", "enableDeleteHotkey", "deleteHotkey"], async (result) => {
+  chrome.storage.local.get(["enableHotkeys", "enableAiHotkey", "aiHotkey", "enableStarHotkey", "starHotkey", "enableArchiveHotkey", "archiveHotkey", "enableDeleteHotkey", "deleteHotkey"], async (result) => {
     if (!result.enableHotkeys) return;
 
-    if (result.enableStarHotkey && keyCombo === result.starHotkey) {
+    if (result.enableAiHotkey && keyCombo === result.aiHotkey) {
+      const button = document.querySelector(".ai-classify-button");
+      if (button) {
+        button.click();
+      }
+    } else if (result.enableStarHotkey && keyCombo === result.starHotkey) {
       await toggleStar(cardId);
     } else if (result.enableArchiveHotkey && keyCombo === result.archiveHotkey) {
       await toggleArchive(cardId);

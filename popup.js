@@ -105,6 +105,8 @@ function loadSettings() {
       "maxLength",
       "enableTags",
       "enableHotkeys",
+      "enableAiHotkey",
+      "aiHotkey",
       "enableStarHotkey",
       "starHotkey",
       "enableArchiveHotkey",
@@ -151,6 +153,8 @@ function loadSettings() {
       hotkeysSettings.style.display = enableHotkeys.checked ? "block" : "none";
 
       // 加载各个快捷键设置
+      document.getElementById("enableAiHotkey").checked = result.enableAiHotkey || false;
+      document.getElementById("aiHotkey").value = result.aiHotkey || "F";
       document.getElementById("enableStarHotkey").checked = result.enableStarHotkey || false;
       document.getElementById("starHotkey").value = result.starHotkey || "S";
       document.getElementById("enableArchiveHotkey").checked = result.enableArchiveHotkey || false;
@@ -459,6 +463,8 @@ function showStatus(message, type, isCategory = false, elementId = "status") {
 // 添加保存快捷键设置的函数
 function saveHotkeySettings() {
   const enableHotkeys = document.getElementById("enableHotkeys").checked;
+  const enableAiHotkey = document.getElementById("enableAiHotkey").checked;
+  const aiHotkey = document.getElementById("aiHotkey").value;
   const enableStarHotkey = document.getElementById("enableStarHotkey").checked;
   const starHotkey = document.getElementById("starHotkey").value;
   const enableArchiveHotkey = document.getElementById("enableArchiveHotkey").checked;
@@ -470,6 +476,7 @@ function saveHotkeySettings() {
     // 验证快捷键是否重复
     if (enableHotkeys) {
       const enabledHotkeys = [];
+      if (enableAiHotkey) enabledHotkeys.push(aiHotkey);
       if (enableStarHotkey) enabledHotkeys.push(starHotkey);
       if (enableArchiveHotkey) enabledHotkeys.push(archiveHotkey);
       if (enableDeleteHotkey) enabledHotkeys.push(deleteHotkey);
@@ -485,6 +492,8 @@ function saveHotkeySettings() {
     chrome.storage.local.set(
       {
         enableHotkeys,
+        enableAiHotkey,
+        aiHotkey,
         enableStarHotkey,
         starHotkey,
         enableArchiveHotkey,

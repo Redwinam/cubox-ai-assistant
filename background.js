@@ -202,15 +202,17 @@ function parseAISuggestions(aiResponse) {
 
 // 构建 AI 提示
 async function buildPrompt(article, categories) {
-  let content = article.content;
-  const originalLength = content.length;
+  // 合并标题、描述和内容
+  let combinedContent = [article.title, article.description, article.content].filter(Boolean).join("\n\n");
+
+  const originalLength = combinedContent.length;
 
   // 检查是否需要限制内容长度
   const result = await chrome.storage.local.get(["enableMaxLength", "maxLength", "enableTags"]);
   if (result.enableMaxLength && result.maxLength) {
     const maxLength = parseInt(result.maxLength);
-    if (content.length > maxLength) {
-      content = content.substring(0, maxLength) + "...（已截断）";
+    if (combinedContent.length > maxLength) {
+      combinedContent = combinedContent.substring(0, maxLength) + "...（已截断）";
       console.log(`Content length reduced from ${originalLength} to ${maxLength} characters`);
     }
   }
@@ -223,9 +225,7 @@ async function buildPrompt(article, categories) {
 
   prompt += `
 
-文章标题：${article.title}
-文章描述：${article.description}
-文章内容：${content}
+文章内容：${combinedContent}
 
 可选分类：
 ${categories.map((cat) => `${cat.groupId}: ${cat.groupName}${cat.description ? ` (${cat.description})` : ""}`).join("\n")}
@@ -241,12 +241,11 @@ ${
 
   console.log("Generated prompt:", {
     titleLength: article.title.length,
-    descriptionLength: article.description.length,
-    contentLength: content.length,
+    contentLength: combinedContent.length,
     categoriesCount: categories.length,
     totalPromptLength: prompt.length,
-    wasContentTruncated: originalLength !== content.length,
-    truncatedAmount: originalLength - content.length,
+    wasContentTruncated: originalLength !== combinedContent.length,
+    truncatedAmount: originalLength - combinedContent.length,
     enableTags: result.enableTags,
   });
 
